@@ -1,0 +1,43 @@
+name: Package linting
+
+on:
+  pull_request:
+    paths-ignore:
+      - '**.md'
+  push:
+    paths-ignore:
+      - '**.md'
+    branches:
+      - main
+      - ci-debug
+  schedule:
+    - cron: "0 11 * * 0"
+
+jobs:
+  linting:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v7
+      - uses: purcell/setup-emacs@master
+        with:
+          version: 31.1
+
+      - name: Install Eldev
+        uses: emacs-eldev/setup-eldev@v1
+
+      - name: Install dependencies
+        run: eldev prepare test
+
+      - name: Byte compile
+        run: eldev compile
+
+      - name: Package lint
+        run: eldev lint package-lint
+
+      - name: relint
+        run: eldev lint relint
+
+      - name: Checkdoc
+        run: eldev lint checkdoc

@@ -1,0 +1,44 @@
+# melpazoid <https://github.com/riscy/melpazoid> build checks.
+
+# If your package is on GitHub, enable melpazoid's checks by copying this file
+# to .github/workflows/melpazoid.yml and modifying RECIPE and EXIST_OK below.
+
+name: melpazoid
+on:
+  pull_request:
+    paths-ignore:
+      - '**.md'
+  push:
+    paths-ignore:
+      - '**.md'
+    branches:
+      - main
+      - ci-debug
+  schedule:
+    - cron: "0 12 * * 0"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        python-version: 3.14
+    - name: Install
+      run: |
+        sudo apt-get install emacs && emacs --version
+        git clone https://github.com/riscy/melpazoid.git ~/melpazoid
+        uv venv
+        source .venv/bin/activate
+        cd ~/melpazoid
+        uv sync --active
+    - name: Run
+      env:
+        LOCAL_REPO: ${{ github.workspace }}
+        # RECIPE is your recipe as written for MELPA:
+        RECIPE: (pre-commit :fetcher github :repo "johannes-mueller/pre-commit.el")
+        # set this to false (or remove it) if the package isn't on MELPA:
+        EXIST_OK: true
+      run: echo $GITHUB_REF && make -C ~/melpazoid
