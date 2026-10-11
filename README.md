@@ -1,3 +1,8 @@
+[![Tests](https://github.com/johannes-mueller/pre-commit.el/actions/workflows/test.yml/badge.svg)](https://github.com/johannes-mueller/pre-commit.el/actions/workflows/test.yml)
+[![Package
+linting](https://github.com/johannes-mueller/pre-commit.el/actions/workflows/package-lint-checkdoc.yml/badge.svg)](https://github.com/johannes-mueller/pre-commit.el/actions/workflows/package-lint-checkdoc.yml)
+[![melpazoid](https://github.com/johannes-mueller/pre-commit.el/actions/workflows/melpazoid.yml/badge.svg)](https://github.com/johannes-mueller/pre-commit.el/actions/workflows/melpazoid.yml)
+
 # pre-commit.el
 
 An Emacs frontend for the [pre-commit](https://pre-commit.com) tool
