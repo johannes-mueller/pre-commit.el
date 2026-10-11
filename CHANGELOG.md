@@ -29,4 +29,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Declare the `transient` dependency (>= 0.10.1).  The verbose switch uses
+  `:remember-value 'export`, which requires transient 0.10.0+, while Emacs 30
+  bundles an older transient; without the explicit dependency the package
+  failed to load there.
+
 ### Changed

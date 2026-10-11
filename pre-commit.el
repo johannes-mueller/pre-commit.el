@@ -4,7 +4,7 @@
 
 ;; Author: Johannes Mueller <github@johannes-mueller.org>
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "30.1"))
+;; Package-Requires: ((emacs "30.1") (transient "0.10.1"))
 ;; Keywords: tools, vc
 ;; URL: https://github.com/johannes-mueller/pre-commit.el
 

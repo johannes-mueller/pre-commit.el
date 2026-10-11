@@ -11,7 +11,9 @@ interactive functions.
 ## Requirements
 
 - **Emacs >= 30.1** (uses `if-let*`, `when-let*`; no `if-let`/`when-let`)
-- **transient >= 0.3.0** (for `pre-commit-dispatch`)
+- **transient >= 0.10.1** (for `pre-commit-dispatch`; the `:remember-value`
+  prefix slot needs 0.10.0, and 0.10.1 fixes `transient--get-savable-value`
+  while exiting, see transient issue #410)
 
 ## Architecture
 
