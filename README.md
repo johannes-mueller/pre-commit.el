@@ -12,7 +12,9 @@ Use the command `pre-commit-dispatch` to get a transient menu to run the
 `pre-commit` tool.
 
 You can choose the hook you want to run and if you want to run it on all files,
-the current file or only the uncommitted changes.
+the current file or only the uncommitted changes. The "Options" column contains a
+switch (`-v`) that passes `--verbose` to the `pre-commit run` commands invoked
+from the transient.
 
 
 ## Install

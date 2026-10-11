@@ -107,6 +107,111 @@ A `.git' directory is created so that `vc-git-root' detects the repository."
         (pre-commit-run "--all-files")
         (should (equal "pre-commit run --color=always --all-files" compile-called))))))
 
+(ert-deftest pre-commit-run-pass-through-verbose-arg ()
+  (with-temp-git-repo
+    (let ((compile-called nil))
+      (cl-letf (((symbol-function 'compile) (lambda (cmd) (setq compile-called cmd))))
+        (pre-commit-run "--verbose")
+        (should (equal "pre-commit run --color=always --verbose" compile-called))))))
+
+(ert-deftest pre-commit-dispatch-uncommitted-reads-transient-args ()
+  (with-temp-git-repo
+    (let ((compile-called nil))
+      (cl-letf (((symbol-function 'transient-args) (lambda (&rest _) (list "--verbose")))
+                ((symbol-function 'compile) (lambda (cmd) (setq compile-called cmd))))
+        (setq pre-commit-selected-hook nil)
+        (call-interactively 'pre-commit-dispatch-uncommitted)
+        (should (equal "pre-commit run --color=always --verbose" compile-called))))))
+
+(ert-deftest pre-commit-dispatch-uncommitted-with-hook-and-args ()
+  (with-temp-git-repo
+    (let ((compile-called nil)
+          (pre-commit-selected-hook "black"))
+      (cl-letf (((symbol-function 'compile) (lambda (cmd) (setq compile-called cmd))))
+        (pre-commit-dispatch-uncommitted '("--verbose"))
+        (should (equal "pre-commit run --color=always black --verbose"
+                       compile-called))))))
+
+(ert-deftest pre-commit-dispatch-all-with-hook-and-args ()
+  (with-temp-git-repo
+    (let ((compile-called nil)
+          (pre-commit-selected-hook "black"))
+      (cl-letf (((symbol-function 'compile) (lambda (cmd) (setq compile-called cmd))))
+        (pre-commit-dispatch-all '("--verbose"))
+        (should (equal "pre-commit run --color=always black --all-files --verbose"
+                       compile-called))))))
+
+(ert-deftest pre-commit-dispatch-file-with-args ()
+  (with-temp-git-repo
+    (let ((compile-called nil)
+          (pre-commit-selected-hook nil))
+      (cl-letf (((symbol-function 'compile) (lambda (cmd) (setq compile-called cmd))))
+        (with-current-buffer (generate-new-buffer "test")
+          (setq buffer-file-name "/tmp/foo.el")
+          (pre-commit-dispatch-file '("--verbose"))
+          (should (equal "pre-commit run --color=always --files /tmp/foo.el --verbose"
+                         compile-called))
+          (kill-buffer))))))
+
+(ert-deftest pre-commit-repeat-reads-transient-args-without-recording ()
+  (with-temp-git-repo
+    (let ((compile-called nil))
+      (cl-letf (((symbol-function 'transient-args) (lambda (&rest _) (list "--verbose")))
+                ((symbol-function 'compile) (lambda (cmd) (setq compile-called cmd))))
+        (pre-commit-run "--all-files")
+        (call-interactively 'pre-commit-repeat)
+        (should (equal "pre-commit run --color=always --all-files --verbose"
+                       compile-called))
+        ;; The replayed command must not be recorded with transient args.
+        (setq compile-called nil)
+        (pre-commit-repeat)
+        (should (equal "pre-commit run --color=always --all-files" compile-called))))))
+
+(ert-deftest pre-commit-dispatch-remembers-verbose-switch ()
+  "The verbose switch state persists over multiple dispatch invocations."
+  (ert-with-temp-directory root
+    (let ((compile-called nil)
+          (default-directory root))
+      ;; A real git repository is required, because the dispatch menu
+      ;; evaluates `pre-commit--no-uncommitted-changes-p' when setting up.
+      (should (zerop (call-process "git" nil nil nil "init" "-q")))
+      (call-process "git" nil nil nil "config" "user.email" "t@t")
+      (call-process "git" nil nil nil "config" "user.name" "t")
+      (with-temp-buffer
+        (insert "hello\n")
+        (write-region (point-min) (point-max) (expand-file-name "f.txt" root)))
+      (call-process "git" nil nil nil "add" "f.txt")
+      (call-process "git" nil nil nil "commit" "-q" "-m" "init")
+      (with-temp-buffer
+        (insert "- repo: local\n  hooks:\n    - id: black\n")
+        (write-region (point-min) (point-max)
+                      (expand-file-name ".pre-commit-config.yaml" root)))
+      ;; Exiting the transient restores the buffer shown in the selected
+      ;; window.  Display the current buffer there, so that the
+      ;; buffer-local `default-directory' bound above is preserved
+      ;; across dispatch invocations.
+      (save-window-excursion
+        (set-window-buffer (selected-window) (current-buffer))
+        ;; Transient echoes its menu through `message'; in batch mode that
+        ;; would otherwise smear blank lines across the test output.
+        (let ((inhibit-message t))
+          (cl-letf (((symbol-function 'compile) (lambda (cmd) (setq compile-called cmd))))
+            ;; Enable the switch and run an action.
+            (transient-setup 'pre-commit-dispatch)
+            (execute-kbd-macro (kbd "-v"))
+            (execute-kbd-macro (kbd "a"))
+            (should (equal "pre-commit run --color=always --all-files --verbose"
+                           compile-called))
+            ;; Reopen the dispatch: the switch is still enabled.
+            (transient-setup 'pre-commit-dispatch)
+            (should (equal '("--verbose") (transient-args 'pre-commit-dispatch)))
+            ;; Disable the switch, run again, and verify the off state persists.
+            (execute-kbd-macro (kbd "-v"))
+            (execute-kbd-macro (kbd "a"))
+            (transient-setup 'pre-commit-dispatch)
+            (should (equal nil (transient-args 'pre-commit-dispatch)))
+            (execute-kbd-macro (kbd "C-g"))))))))
+
 (ert-deftest pre-commit-run-hook-noninteractive ()
   (with-temp-git-repo
     (let ((compile-called nil))
@@ -184,7 +289,8 @@ A `.git' directory is created so that `vc-git-root' detects the repository."
         (insert "- repo: local\n  hooks:\n    - id: black\n")
         (write-region (point-min) (point-max)
                       (expand-file-name ".pre-commit-config.yaml" root)))
-      (cl-letf (((symbol-function 'compile) (lambda (cmd) (setq compile-called cmd))))
+      (cl-letf (((symbol-function 'transient-args) (lambda (&rest _) nil))
+                ((symbol-function 'compile) (lambda (cmd) (setq compile-called cmd))))
         (setq pre-commit-selected-hook nil)
         (call-interactively 'pre-commit-dispatch-uncommitted)
         (should (equal "pre-commit run --color=always" compile-called))))))

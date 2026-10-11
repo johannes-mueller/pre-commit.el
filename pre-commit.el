@@ -156,18 +156,21 @@ Changes `default-directory' to ROOT and runs `compile'."
     (let ((default-directory root))
       (compile (pre-commit--compose-command-string args)))))
 
-(defun pre-commit--run-args-in-root (root args)
+(defun pre-commit--run-args-in-root (root args &optional extra-args)
   "Run pre-commit with ARGS in project ROOT.
-Records the command for `pre-commit-repeat' before running it."
+Records ARGS for `pre-commit-repeat', then runs ARGS followed by
+EXTRA-ARGS.  EXTRA-ARGS are not recorded, so that arguments coming
+from a transient are re-evaluated on every invocation."
   (when root
     (pre-commit--record-last-command root args)
-    (pre-commit--run-in-root root args)))
+    (pre-commit--run-in-root root (append args extra-args))))
 
-(defun pre-commit--maybe-run-args (args)
+(defun pre-commit--maybe-run-args (args &optional extra-args)
   "Run pre-commit with ARGS in current project root, recording it.
+EXTRA-ARGS are appended to the command but not recorded.
 Signals `user-error' if not in a git repo."
   (if-let* ((root (pre-commit--project-root)))
-      (pre-commit--run-args-in-root root args)
+      (pre-commit--run-args-in-root root args extra-args)
     (user-error "Not in a git repository")))
 
 (defun pre-commit--maybe-run-args-no-record (args)
@@ -222,14 +225,16 @@ If called interactively, prompts for HOOK and uses current buffer's file."
   (pre-commit--maybe-run-args (list "run" hook "--files" file)))
 
 ;;;###autoload
-(defun pre-commit-repeat ()
+(defun pre-commit-repeat (&optional extra-args)
   "Repeat the last pre-commit run for the current project.
+EXTRA-ARGS are appended to the replayed command and are not
+recorded, so they are re-evaluated on every invocation.
 Signals `user-error' if no previous run is recorded."
-  (interactive)
+  (interactive (list (transient-args 'pre-commit-dispatch)))
   (if-let* ((root (pre-commit--project-root))
             (last (pre-commit--lookup-last-command root))
             (last (if (seq-empty-p last) nil last)))
-      (pre-commit--run-args-in-root root last)
+      (pre-commit--run-args-in-root root last extra-args)
     (user-error "No previous pre-commit run recorded")))
 
 ;;;###autoload
@@ -295,11 +300,14 @@ activating the suffix again clears the selection."
 (transient-define-prefix pre-commit-dispatch ()
   "Dispatch pre-commit commands."
   :man-page "pre-commit"
-  ["Hook"
-   ("h" pre-commit-select-hook
-    :description pre-commit--select-hook-description
-    :transient t
-    :inapt-if pre-commit--no-hooks-p)]
+  :remember-value 'export
+  [["Hook"
+    ("h" pre-commit-select-hook
+     :description pre-commit--select-hook-description
+     :transient t
+     :inapt-if pre-commit--no-hooks-p)]
+   ["Options"
+    ("-v" "Verbose" "--verbose")]]
   [["Scope"
     ("u" "Uncommitted changes" pre-commit-dispatch-uncommitted
      :inapt-if pre-commit--disable-uncommitted-p)
@@ -333,28 +341,35 @@ dispatch commands run all hooks again."
   (when-let* ((h pre-commit-selected-hook))
     (unless (string= h "") h)))
 
-(defun pre-commit-dispatch-uncommitted ()
-  "Run pre-commit for uncommitted changes with selected hook."
-  (interactive)
-  (if-let* ((h (pre-commit--dispatch-hook)))
-      (pre-commit-run-hook h)
-    (pre-commit-run)))
+(defun pre-commit--run-args (hook &rest extra)
+  "Return `run' subcommand argument strings for HOOK and EXTRA.
+When HOOK is nil, all hooks are run.  EXTRA are appended in order."
+  (append (list "run") (when hook (list hook)) extra))
 
-(defun pre-commit-dispatch-all ()
-  "Run pre-commit for all files with selected hook."
-  (interactive)
-  (if-let* ((h (pre-commit--dispatch-hook)))
-      (pre-commit--maybe-run-args (list "run" h "--all-files"))
-    (pre-commit--maybe-run-args (list "run" "--all-files"))))
+(defun pre-commit-dispatch-uncommitted (&optional extra-args)
+  "Run pre-commit for uncommitted changes with selected hook.
+EXTRA-ARGS are the arguments of the `pre-commit-dispatch' transient."
+  (interactive (list (transient-args 'pre-commit-dispatch)))
+  (pre-commit--maybe-run-args
+   (pre-commit--run-args (pre-commit--dispatch-hook))
+   extra-args))
 
-(defun pre-commit-dispatch-file ()
-  "Run pre-commit for current file with selected hook."
-  (interactive)
-  (if-let* ((f (pre-commit--file-if-visiting))
-            (h (pre-commit--dispatch-hook)))
-      (if h
-          (pre-commit-run-hook-on-file h f)
-        (pre-commit-run-on-file f))
+(defun pre-commit-dispatch-all (&optional extra-args)
+  "Run pre-commit for all files with selected hook.
+EXTRA-ARGS are the arguments of the `pre-commit-dispatch' transient."
+  (interactive (list (transient-args 'pre-commit-dispatch)))
+  (pre-commit--maybe-run-args
+   (pre-commit--run-args (pre-commit--dispatch-hook) "--all-files")
+   extra-args))
+
+(defun pre-commit-dispatch-file (&optional extra-args)
+  "Run pre-commit for current file with selected hook.
+EXTRA-ARGS are the arguments of the `pre-commit-dispatch' transient."
+  (interactive (list (transient-args 'pre-commit-dispatch)))
+  (if-let* ((f (pre-commit--file-if-visiting)))
+      (pre-commit--maybe-run-args
+       (pre-commit--run-args (pre-commit--dispatch-hook) "--files" f)
+       extra-args)
     (user-error "Current buffer has no file")))
 
 (provide 'pre-commit)

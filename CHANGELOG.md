@@ -23,6 +23,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Customization variable `pre-commit-use-color` to control colored output
   (default: `t`). When non-nil, `--color=always' is passed to pre-commit;
   when nil, `--color=never' is passed.
+- Verbose switch (`-v`), available in `pre-commit-dispatch` under "Options".
+  When enabled, `--verbose` is passed as an argument to the `pre-commit run`
+  commands invoked from the transient.
 
 ### Fixed
 
