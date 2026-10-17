@@ -103,8 +103,3 @@ eldev lint checkdoc
 
 Hooks are discovered by parsing `.pre-commit-config.yaml` (preferred) or
 `.pre-commit-config.yml` for `- id: <name>` lines. No CLI call to pre-commit.
-
-## Known issues / TODO
-
-- `melpazoid.yml` has a stale `RECIPE: (dired-gitignore ...)` from a
-  copy-paste — should be updated to `(pre-commit :fetcher github :repo "johannes-mueller/pre-commit.el")`.
